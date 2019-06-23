@@ -1,15 +1,33 @@
 import numpy as np
 
 
-def centroids_init(X, k):
+def centroids_init(X, n_clusters, mode='random'):
     """
     初始化中心点
     """
-    n_samples, dim = X.shape
-    random_state = np.random.mtrand._rand
-    seeds = random_state.permutation(n_samples)[:k]
-    centroids = X[seeds]
-    return centroids
+    n_samples, n_features = X.shape
+    centroids = np.empty((n_clusters, n_features), dtype=X.dtype)
+    if mode == 'random':
+        random_state = np.random.mtrand._rand
+        seeds = random_state.permutation(n_samples)[:n_clusters]
+        centroids = X[seeds]
+    elif mode == 'kmeans++':
+        # n_local_trials = 2 + int(np.log(n_clusters))
+        random_state = np.random.mtrand._rand
+
+        # select the first center randomly
+        index_0 = np.random.randint(0, n_samples)
+        centroids[0] = X[index_0]
+
+        for i in range(1, n_clusters):
+            # compute the distances to known-centers
+            dist = compute_dist(X, centroids[:i])
+            min_dist = dist.min(axis=1)
+            prob = min_dist / min_dist.sum()
+            # 依概率随机选取下一个中心点
+            index = np.random.choice(np.arange(len(prob)), p=prob.ravel())
+            centroids[i] = np.copy(X[index])
+    return centroids-+-
 
 
 def compute_dist(X, Y):
@@ -19,7 +37,7 @@ def compute_dist(X, Y):
     XX = np.sum(X*X, axis=1)[:, np.newaxis]
     YY = np.sum(Y*Y, axis=1)
     XY = np.dot(X, Y.T)
-    return XX + YY - 2 * XY
+    return np.maximum(XX + YY - 2 * XY, 0)
 
 
 def update_centers(X, n_clusters, labels, distances):
@@ -56,11 +74,11 @@ def k_init(X, ):
     return
 
 
-def k_means(X, n_clusters, max_iter, verbose=False, tol=1e-4):
+def k_means(X, n_clusters, max_iter, init_mode='kmeans++', verbose=False, tol=1e-4):
     best_labels, best_inertia, best_centers = None, None, None
     # init
     n_samples = X.shape[0]
-    centers = centroids_init(X, n_clusters)
+    centers = centroids_init(X, n_clusters, init_mode)
 
     # Allocate memory to store the distances for each sample to its
     # closer center for reallocation in case of ties
